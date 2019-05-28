@@ -66,7 +66,9 @@ class Player{
 	vector<Limb> feet;
 	//Player Actions
 	bool attack();
-	bool distribute(vector<int>,int,socketstream[],int);
+	bool attack2(socketstream[], int);
+	bool distribute(vector<int>);
+	bool distribute2(vector<int>,socketstream[],int);
 	void turnprep();
 	void checkhealth();
 	void viewstats();
@@ -316,17 +318,175 @@ bool Player::attack(){
 	return false;
 }
 
-
-bool Player::distribute(vector<int> dist, int type, socketstream sockets[], int player_ID){
-	for(int i = 0; i < dist.size(); i++){
-		if(type==1)
-			cout << dist[i] << " ";
-		else{
-			sockets[player_ID] << 0 << endl;
-			sockets[player_ID] << dist[i] << " " << endl;
+bool Player::attack2(socketstream sockets[], int player_ID){
+	while(true){
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << "------------------------------------------------------------------------------" << endl;
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << "Attack. Please select a target by typing their player number." << endl;
+		//
+		for(int i = 0; i < master_list.size(); i++){
+			if (master_list.at(i).team_id != team_id && !master_list.at(i).is_spectator){
+				sockets[player_ID] << 0 << endl;
+				sockets[player_ID] << i + 1 << ". " << master_list.at(i).username << " (Team " << master_list.at(i).team_id + 1 << ")" << endl;
+			}
 		}
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << "------------------------------------------------------------------------------" << endl;
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << "Enter target : " << endl;
+		int targetnumber;
+		//
+		while(true){
+			sockets[player_ID] << 3;
+			sockets[player_ID] >> targetnumber;
+			sockets[player_ID].ignore();
+
+			if (sockets[player_ID].fail()){
+				sockets[player_ID] << 0 << endl;
+				sockets[player_ID] << "[Error] Invalid input. Did you input the username instead of the Player ID?" << endl;
+				continue;
+			}
+			if (targetnumber <= 0 || targetnumber > master_list.size()){
+				sockets[player_ID] << 0 << endl;
+				sockets[player_ID] << "[Error] No such player exists." << endl;
+				continue;
+			}
+			if (master_list.at(targetnumber-1).player_id == player_id){
+				sockets[player_ID] << 0 << endl;
+				sockets[player_ID] << "[Error] You wish to attack yourself? Please select a different player." << endl;
+				continue;
+			}
+			if (master_list.at(targetnumber-1).team_id == team_id){
+				sockets[player_ID] << 0 << endl;
+				sockets[player_ID] << "[Error] This player is your friend. Please select a different player." << endl;
+				continue;
+			}
+			if (master_list.at(targetnumber-1).is_spectator){
+				sockets[player_ID] << 0 << endl;
+				sockets[player_ID] << "[Error] This player is dead. Please select a different player." << endl;
+				continue;
+			}
+			break;
+		}
+
+		Player* target = &(master_list.at(targetnumber-1));
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << "------------------------------------------------------------------------------"  << endl;
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << target->username << "'s extremities. Select one by typing the name and number (e.g. hand 2) Use lowercase only."<< endl;
+		vector<int> validhands;
+		vector<int> validfeet;
+		for(int i = 0; i < target->hands.size(); i++){
+			if (!target->hands.at(i).is_dead){
+				sockets[player_ID] << 0 << endl;
+				sockets[player_ID] << "hand " << i+1 << " :" << target->hands.at(i).fingers << "/" << target->hands.at(i).max_fingers << " fingers." << endl;
+				validhands.push_back(i);
+			}
+		}
+		for(int i = 0; i < target->feet.size(); i++){
+			if (!target->feet.at(i).is_dead){
+				sockets[player_ID] << 0 << endl;
+				sockets[player_ID] << "foot " << i+1 << " :" << target->feet.at(i).fingers << "/" << target->feet.at(i).max_fingers << " toes." << endl;
+				validfeet.push_back(i);
+			}
+		}
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << "------------------------------------------------------------------------------"  << endl;
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << "Enter target : ";
+		string targetpart;
+		int targetno;
+		Limb* targetlimb;
+		while(true){
+			sockets[player_ID] << 3;
+			sockets[player_ID] >> targetpart;
+			sockets[player_ID].ignore();
+			sockets[player_ID] << 3;
+			sockets[player_ID] >> targetno;
+			sockets[player_ID].ignore();
+			if (targetpart == "hand"){
+				if (find(validhands.begin(),validhands.end(),targetno-1) != validhands.end()){
+					targetlimb = &(target->hands.at(targetno-1));
+					break;
+				}
+			}
+			if (targetpart == "foot"){
+				if (find(validfeet.begin(),validfeet.end(),targetno-1) != validfeet.end()){
+					targetlimb = &(target->feet.at(targetno-1));
+					break;
+				}
+			}
+			else{
+				sockets[player_ID] << 0 << endl;
+				sockets[player_ID] << "[Error] Invalid input." << endl;
+				continue;
+			}			
+		}
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << "------------------------------------------------------------------------------"  << endl;
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << "Your extremities. Choose one to attack with using the same format (e.g. hand 1)" << endl;
+		vector<int> myvalidhands;
+		vector<int> myvalidfeet;
+		for(int i = 0; i < hands.size(); i++){
+			if (!hands.at(i).is_dead){
+				sockets[player_ID] << 0 << endl;
+				sockets[player_ID] << "hand " << i+1 << ": " << hands.at(i).fingers << "/" << hands.at(i).max_fingers << " fingers." << endl;
+				myvalidhands.push_back(i);
+			}
+		}
+		for(int i = 0; i < feet.size(); i++){
+			if (!feet.at(i).is_dead){
+				sockets[player_ID] << 0 << endl;
+				sockets[player_ID] << "foot " << i+1 << " : " << feet.at(i).fingers << "/" << feet.at(i).max_fingers << " toes." << endl;
+				myvalidfeet.push_back(i);
+			}
+		}
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << "#------------------------------------------------------------------------------"  << endl;
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << "Enter weapon : ";
+		string mypart;
+		int myno;
+		Limb* attacklimb;
+		while(true){
+			sockets[player_ID] << 3;
+			sockets[player_ID] >> mypart;
+			sockets[player_ID].ignore();
+			sockets[player_ID] << 3;
+			sockets[player_ID] >> myno;
+			sockets[player_ID].ignore();
+			if (mypart == "hand"){
+				if (find(myvalidhands.begin(),myvalidhands.end(),myno-1) != myvalidhands.end()){
+					attacklimb = &(hands.at(myno-1));
+					break;
+				}
+			}
+			if (mypart == "foot"){
+				if (find(myvalidfeet.begin(),myvalidfeet.end(),myno-1) != myvalidfeet.end()){
+					attacklimb = &(feet.at(myno-1));
+					break;
+				}
+			}
+			sockets[player_ID] << 0 << endl;
+			sockets[player_ID] << "[Error] Invalid input." << endl;
+		}
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << "[Server] Attack is registered." << endl;
+		bool oof = targetlimb->add_fingers(attacklimb->fingers);
+		if (oof){
+			if (targetlimb->is_foot && !target->steeltoes) target->skipped = 1;
+			target->damage++;
+			target->checkhealth();
+		}
+		if (target->goodboi && !goodboi) skipped = 1;
+		return true;
 	}
-	
+	return false;
+}
+
+bool Player::distribute(vector<int> dist){	
 	vector<int> livehands;
 	vector<int> currentvalues;
 	int totalfingers = 0;
@@ -339,38 +499,27 @@ bool Player::distribute(vector<int> dist, int type, socketstream sockets[], int 
 		}
 	}
 	
-
+	if(debugmode) cout << '\n';
+	if(debugmode) cout << "[Server] For a total of " << totalfingers << " fingers." << '\n';
 	
 	if (livehands.size() == 1){
-		if(type == 1)
-			cout << "[Error] You only have one hand left. Unable to distribute." << '\n';
-		else
-			sockets[player_ID]  << "[Error] You only have one hand left. Unable to distribute." << endl;
+		cout << "[Error] You only have one hand left. Unable to distribute." << '\n';
 		return false;
 	}
 	
 	if (livehands.size() == 0){
-		if(type == 1)
-			cout << "[Error] You have no hands." << '\n';
-		else
-			sockets[player_ID] << "[Error] You have no hands." << endl;
+		cout << "[Error] You have no hands." << '\n';
 		return false;
 	}
 	
 	if (dist.size() < livehands.size()){
-		if(type == 1)
-			cout << "[Error] Missing parameters. You did not distribute to all live hands." << '\n';
-		else
-			sockets[player_ID] << "[Error] Missing parameters. You did not distribute to all live hands." << endl;
-			
+		cout << "[Error] Missing parameters. You did not distribute to all live hands." << '\n';
+		cout << "	     If you wish to free a hand (e.g. distribute 0 2), please say so." << '\n';
 		return false;
 	}
 	
 	if (dist.size() > livehands.size()){
-		if(type == 1)
-			cout << "[Error] Excess parameters. Trying to cheat?" << '\n';
-		else
-			sockets[player_ID] << "[Error] Excess parameters. Trying to cheat?" << endl;
+		cout << "[Error] Excess parameters. Trying to cheat?" << '\n';
 		return false;
 	}
 	
@@ -382,20 +531,14 @@ bool Player::distribute(vector<int> dist, int type, socketstream sockets[], int 
 	}
 	
 	if (!different){
-		if(type == 1)
-			cout << "[Error] Fingers already distributed that way." << '\n';
-		else
-			sockets[player_ID] << "[Error] Fingers already distributed that way." << endl;
+		cout << "[Error] Fingers already distributed that way." << '\n';
 		return false;
 	}
 	
 	for (int i = 0; i < dist.size(); i++){
 		if (dist.at(i) == hands[i].max_fingers){
-			if(type == 1)
-				cout << "[Error] Distribution will kill a live hand." << '\n';
-			else
-				sockets[player_ID] << "[Error] Distribution will kill a live hand." << endl;
-			return false;
+		cout << "[Error] Distribution will kill a live hand." << '\n';
+		return false;
 		}
 	}
 	
@@ -405,19 +548,97 @@ bool Player::distribute(vector<int> dist, int type, socketstream sockets[], int 
 	}
 	
 	if (newtotalfingers != totalfingers){
-		if(type == 1)
-			cout << "[Error] Distribution has missing/extra fingers." << '\n';
-		else
-			sockets[player_ID] << "[Error] Distribution has missing/extra fingers." << endl;
+		cout << "[Error] Distribution has missing/extra fingers." << '\n';
 		return false;
 	}
 	
 	for (int i = 0; i < dist.size(); i++){
 		if (dist.at(i) > hands[i].max_fingers){
-			if(type == 1)
-				cout << "[Error] Distribution exceeds max fingers. You cannot overflow when distributing." << '\n';
-			else
-				sockets[player_ID] << "[Error] Distribution exceeds max fingers. You cannot overflow when distributing." << endl;
+			cout << "[Error] Distribution exceeds max fingers. You cannot overflow when distributing." << '\n';
+		}
+	}
+	
+	for(int i = 0; i < dist.size(); i++){
+		hands[livehands.at(i)].fingers = dist.at(i);
+	}
+	return true;
+}
+
+bool Player::distribute2(vector<int> dist, socketstream sockets[], int player_ID){
+	vector<int> livehands;
+	vector<int> currentvalues;
+	int totalfingers = 0;
+	
+	for (int i = 0; i < hands.size(); i++){
+		if (!hands.at(i).is_dead){
+			livehands.push_back(i);
+			currentvalues.push_back(hands.at(i).fingers);
+			totalfingers += hands.at(i).fingers;
+		}
+	}
+	
+	if (livehands.size() == 1){
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << "[Error] You only have one hand left. Unable to distribute." << endl;
+		return false;
+	}
+	
+	if (livehands.size() == 0){
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << "[Error] You have no hands." << endl;
+		return false;
+	}
+	
+	if (dist.size() < livehands.size()){
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << "[Error] Missing parameters. You did not distribute to all live hands." << endl;
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << "	     If you wish to free a hand (e.g. distribute 0 2), please say so." << endl;
+		return false;
+	}
+	
+	if (dist.size() > livehands.size()){
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << "[Error] Excess parameters. Trying to cheat?" << endl;
+		return false;
+	}
+	
+	bool different = 0;
+	for (int i = 0; i < dist.size(); i++){
+		if (dist.at(i) != currentvalues.at(i)){
+			different = 1;
+		}
+	}
+	
+	if (!different){
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << "[Error] Fingers already distributed that way." << endl;
+		return false;
+	}
+	
+	for (int i = 0; i < dist.size(); i++){
+		if (dist.at(i) == hands[i].max_fingers){
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << "[Error] Distribution will kill a live hand." << endl;
+		return false;
+		}
+	}
+	
+	int newtotalfingers = 0;
+	for (int i = 0; i < dist.size(); i++){
+		newtotalfingers += dist.at(i);
+	}
+	
+	if (newtotalfingers != totalfingers){
+		sockets[player_ID] << 0 << endl;
+		sockets[player_ID] << "[Error] Distribution has missing/extra fingers." << endl;
+		return false;
+	}
+	
+	for (int i = 0; i < dist.size(); i++){
+		if (dist.at(i) > hands[i].max_fingers){
+		sockets[player_ID] << 0 << endl;
+			sockets[player_ID] << "[Error] Distribution exceeds max fingers. You cannot overflow when distributing." << endl;
 		}
 	}
 	
@@ -533,7 +754,6 @@ void superpinter(socketstream sockets[]){
 						sockets[q] << 0 << endl;
 						sockets[q] << "Hand " << i + 1 << " is free." << ". " << endl;
 					} 
-					sockets[q] << 0 << endl;
 					if (currplayer->hands.at(i).is_dead == 0){
 						sockets[q] << 0 << endl;
 						sockets[q] << "Hand " << i + 1 << " : " << currplayer->hands.at(i).fingers << ". " << endl;
@@ -611,7 +831,7 @@ void act(int team, Player& actor){
 			if(distvalues.empty()){
 				cout << "[Error] Disthands failed. Are you missing parameters?" << '\n';
 			}
-			done = actor.distribute(distvalues,0,sample,0);
+			done = actor.distribute(distvalues);
 		}
 		else{
 			cout << "[Error] Command not recognised." << '\n';
@@ -625,11 +845,11 @@ void act_client(int team, Player& actor, socketstream sockets[], int player_ID){
 	string command;
 	bool done = 0;
 	while (!done){
-		sockets[player_ID] << 3;
+		sockets[player_ID] << 3 << endl;
 		getline(sockets[player_ID],command);
 		size_t found = command.find("disthands");
 		if (command == "tap"){
-			done = actor.attack();
+			done = actor.attack2(sockets,player_ID);
 		}
 		else if (command == "help"){
 			sockets[player_ID] << 0 << endl;
@@ -645,7 +865,7 @@ void act_client(int team, Player& actor, socketstream sockets[], int player_ID){
 			sockets[player_ID] << 0 << endl;
 			sockets[player_ID] << "Are you sure you want to leave? Input 'yes' to confirm. Press enter to cancel." << endl;
 			string asd;
-			sockets[player_ID] << 3;
+			sockets[player_ID] << 3 << endl;
 			sockets[player_ID] >> asd;
 			sockets[player_ID].ignore();
 			if (asd == "yes"){
@@ -670,7 +890,7 @@ void act_client(int team, Player& actor, socketstream sockets[], int player_ID){
 				sockets[player_ID] << 0 << endl;
 				sockets[player_ID] << "[Error] Disthands failed. Are you missing parameters?" << endl;
 			}
-			done = actor.distribute(distvalues,0, sockets, player_ID);
+			done = actor.distribute2(distvalues, sockets, player_ID);
 		}
 		else{
 			sockets[player_ID] << 0 << endl;
@@ -964,8 +1184,8 @@ void runServer(int argc, char* argv[]) {
 					ss <<  team_list[team_iterator].team_id + 1;
 					temp += ss.str();
 					temp+=" is victorious, this day!";
-					message_all(temp, sockets);
 					key_all(0, sockets);
+					message_all(temp, sockets);
 					cout << temp << endl;
 					break;
 				}
@@ -1094,6 +1314,8 @@ void runServer(int argc, char* argv[]) {
 		//if(debugmode) cout << "[Server] Preparing for next turn..." << '\n';
 		team_iterator = (team_iterator + 1) % team_count;
 	}
+	key_all(2, sockets);
+	
 }
 
 void runClient(int argc, char* argv[]) {
