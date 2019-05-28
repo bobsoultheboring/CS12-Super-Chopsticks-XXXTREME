@@ -15,7 +15,7 @@ using namespace std;
 using namespace swoope;
 
 int PLAYERS = 7;
-
+socketstream sample[2];
 
 //Super Chopsticks v.0.1
 //Project developed by Vince Yalung and Lance Bassig
@@ -66,7 +66,7 @@ class Player{
 	vector<Limb> feet;
 	//Player Actions
 	bool attack();
-	bool distribute(vector<int>);
+	bool distribute(vector<int>,int,socketstream[],int);
 	void turnprep();
 	void checkhealth();
 	void viewstats();
@@ -125,7 +125,6 @@ bool Limb::add_fingers(int add){
 
 //Definition of PLAYER functions
 Player::Player(string namn, int id, int r, int team, int slot){
-	cout << "Making Player " << namn << endl;
 	username = namn;
 	player_id = id;
 	race = r;
@@ -317,9 +316,13 @@ bool Player::attack(){
 	return false;
 }
 
-bool Player::distribute(vector<int> dist){
+
+bool Player::distribute(vector<int> dist, int type, socketstream sockets[], int player_ID){
 	for(int i = 0; i < dist.size(); i++){
-		cout << dist[i] << " ";
+		if(type==1)
+			cout << dist[i] << " ";
+		else
+			sockets[player_ID] << dist[i] << " " << endl;
 	}
 	
 	vector<int> livehands;
@@ -337,23 +340,35 @@ bool Player::distribute(vector<int> dist){
 
 	
 	if (livehands.size() == 1){
-		cout << "[Error] You only have one hand left. Unable to distribute." << '\n';
+		if(type == 1)
+			cout << "[Error] You only have one hand left. Unable to distribute." << '\n';
+		else
+			sockets[player_ID]  << "[Error] You only have one hand left. Unable to distribute." << endl;
 		return false;
 	}
 	
 	if (livehands.size() == 0){
-		cout << "[Error] You have no hands." << '\n';
+		if(type == 1)
+			cout << "[Error] You have no hands." << '\n';
+		else
+			sockets[player_ID] << "[Error] You have no hands." << endl;
 		return false;
 	}
 	
 	if (dist.size() < livehands.size()){
-		cout << "[Error] Missing parameters. You did not distribute to all live hands." << '\n';
-		cout << "	     If you wish to free a hand (e.g. distribute 0 2), please say so." << '\n';
+		if(type == 1)
+			cout << "[Error] Missing parameters. You did not distribute to all live hands." << '\n';
+		else
+			sockets[player_ID] << "[Error] Missing parameters. You did not distribute to all live hands." << endl;
+			
 		return false;
 	}
 	
 	if (dist.size() > livehands.size()){
-		cout << "[Error] Excess parameters. Trying to cheat?" << '\n';
+		if(type == 1)
+			cout << "[Error] Excess parameters. Trying to cheat?" << '\n';
+		else
+			sockets[player_ID] << "[Error] Excess parameters. Trying to cheat?" << endl;
 		return false;
 	}
 	
@@ -365,14 +380,20 @@ bool Player::distribute(vector<int> dist){
 	}
 	
 	if (!different){
-		cout << "[Error] Fingers already distributed that way." << '\n';
+		if(type == 1)
+			cout << "[Error] Fingers already distributed that way." << '\n';
+		else
+			sockets[player_ID] << "[Error] Fingers already distributed that way." << endl;
 		return false;
 	}
 	
 	for (int i = 0; i < dist.size(); i++){
 		if (dist.at(i) == hands[i].max_fingers){
-		cout << "[Error] Distribution will kill a live hand." << '\n';
-		return false;
+			if(type == 1)
+				cout << "[Error] Distribution will kill a live hand." << '\n';
+			else
+				sockets[player_ID] << "[Error] Distribution will kill a live hand." << endl;
+			return false;
 		}
 	}
 	
@@ -382,13 +403,19 @@ bool Player::distribute(vector<int> dist){
 	}
 	
 	if (newtotalfingers != totalfingers){
-		cout << "[Error] Distribution has missing/extra fingers." << '\n';
+		if(type == 1)
+			cout << "[Error] Distribution has missing/extra fingers." << '\n';
+		else
+			sockets[player_ID] << "[Error] Distribution has missing/extra fingers." << endl;
 		return false;
 	}
 	
 	for (int i = 0; i < dist.size(); i++){
 		if (dist.at(i) > hands[i].max_fingers){
-			cout << "[Error] Distribution exceeds max fingers. You cannot overflow when distributing." << '\n';
+			if(type == 1)
+				cout << "[Error] Distribution exceeds max fingers. You cannot overflow when distributing." << '\n';
+			else
+				sockets[player_ID] << "[Error] Distribution exceeds max fingers. You cannot overflow when distributing." << endl;
 		}
 	}
 	
@@ -433,7 +460,7 @@ void Team::checkhealth(){
 	teams_left--;
 }
 
-void superpinter(){
+void superpinter(socketstream sockets[]){
 	cout << "#------------------------------------------------------------------------------" << '\n';
 	cout << "STATUS BOARD" << '\n';
 	cout << "#------------------------------------------------------------------------------" << '\n';
@@ -475,7 +502,6 @@ void superpinter(){
 
 //Game Functions
 void act(int team, Player& actor){
-	cin.ignore();
 	string command;
 	bool done = 0;
 	while (!done){
@@ -516,7 +542,7 @@ void act(int team, Player& actor){
 			if(distvalues.empty()){
 				cout << "[Error] Disthands failed. Are you missing parameters?" << '\n';
 			}
-			done = actor.distribute(distvalues);
+			done = actor.distribute(distvalues,0,sample,0);
 		}
 		else{
 			cout << "[Error] Command not recognised." << '\n';
@@ -525,9 +551,84 @@ void act(int team, Player& actor){
 	actor.actions--;
 }
 
+
+void act_client(int team, Player& actor, socketstream sockets[], int player_ID){
+	string command;
+	bool done = 0;
+	while (!done){
+		sockets[player_ID] << 3;
+		getline(sockets[player_ID],command);
+		size_t found = command.find("disthands");
+		if (command == "tap"){
+			done = actor.attack();
+		}
+		else if (command == "help"){
+			sockets[player_ID] << 0;
+			sockets[player_ID] << "Available Actions:" << endl;
+			sockets[player_ID] << 0;
+			sockets[player_ID] << "Attack - opens a menu which allows you to pick a target and attack. (syntax: tap)"<< endl;
+			sockets[player_ID] << 0;
+			sockets[player_ID] << "Distribute - distributes fingers among your live hands. (syntax: disthands x x x, where x is no. of fingers) " << endl;
+			sockets[player_ID] << 0;
+			sockets[player_ID] << "Surrender - Quit the game. (syntax: surrender)" << endl;
+		}
+		else if (command == "surrender"){
+			sockets[player_ID] << 0;
+			sockets[player_ID] << "Are you sure you want to leave? Input 'yes' to confirm. Press enter to cancel." << endl;
+			string asd;
+			sockets[player_ID] << 3;
+			sockets[player_ID] >> asd;
+			sockets[player_ID].ignore();
+			if (asd == "yes"){
+				actor.damage = actor.health;
+				actor.checkhealth();
+				done = 1;
+			}
+		}
+		else if(found != string::npos && command.length() > 9){
+			int len = command.length();
+			int index = 10; //disthands X - index of X
+			vector<int> distvalues;
+			stringstream stream;
+			while(index < len){
+				if(command[index] != ' '){
+					int in = command[index] - '0';
+					distvalues.push_back(in);
+				}
+				index++; 
+			}
+			if(distvalues.empty()){
+				sockets[player_ID] << 0;
+				sockets[player_ID] << "[Error] Disthands failed. Are you missing parameters?" << endl;
+			}
+			done = actor.distribute(distvalues,0, sockets, player_ID);
+		}
+		else{
+			sockets[player_ID] << 0;
+			sockets[player_ID] << "[Error] Command not recognised." << endl;
+		}
+	}
+	actor.actions--;
+}
+
 void message_all(string s, socketstream sockets[]){
-	for(int i = 0; i < PLAYERS; i++)
+	for(int i = 1; i < PLAYERS; i++)
 		sockets[i] << s << endl;
+}
+
+void key_all(int i, socketstream sockets[]){
+	for(int i = 1; i < PLAYERS; i++)
+		sockets[i] << i << endl;
+	
+	/*
+		KEY GUIDE:
+	   -1: Do Nothing
+		0: Sending a String
+		1: Sending an Int
+		2: Breaking the game
+		3. Taking Input
+	
+	*/
 }
 void char_create_server(int ID, socketstream sockets[]){
 	int highestchoice = 0;
@@ -769,7 +870,161 @@ void runServer(int argc, char* argv[]) {
 	cout << "\nAll players have successfully connected.\n";
 
 	char_create_server(0, sockets);
-	cout << "finished charcreation";
+	
+	//Game Variables
+	int team_iterator = 0;
+	int team_count = team_list.size();
+	teams_left = team_count;
+	
+	selected_player = &(master_list.at(0));
+	pre_game = 1;
+	
+	//Game Start
+	cout << "\nEverything is ready! Let the battle begin!\n" <<
+			"\n\t---GAME START---\n";
+	
+	pre_game = 0;
+	while (true){
+		//Checks for win condition (One team remains)
+		//if(debugmode) cout << "[Server] Checking for win condition." << '\n';
+		if (teams_left == 1){
+			while(true){
+				if(team_list[team_iterator].team_is_alive){
+					stringstream ss;
+					string temp = "Team ";
+					ss <<  team_list[team_iterator].team_id + 1;
+					temp += ss.str();
+					temp+=" is victorious, this day!";
+					message_all(temp, sockets);
+					key_all(0, sockets);
+					cout << temp << endl;
+					break;
+				}
+				team_iterator = (team_iterator + 1) % team_count;
+			}
+			break;
+		}
+		//if(debugmode) cout << "[Server] Win condition unachieved. Continuing game." << '\n';
+		
+		//Team and Player Selection
+		//cout << "[Server] TEAM SELECTION PHASE START." << '\n'; 
+		while(true){
+			
+			//if(debugmode) cout << "[Server] Team" << team_iterator + 1 << " is being checked." << '\n';
+			
+			//Find a living team
+			if (!team_list[team_iterator].team_is_alive){
+				//if(debugmode) cout << "[Server] Team " << team_iterator + 1 << " was eliminated." << '\n';
+				team_iterator = (team_iterator + 1) % team_count;
+				continue;
+			}
+			
+			//Select team that will participate
+			Team* selected_team = &(team_list.at(team_iterator));
+			
+			//if(debugmode) cout << "[Server] Team" << team_iterator + 1 << " is chosen for player selection." << '\n';
+			
+			//First, pick the player that is first in line to represent the team, referred to as original selected player
+			Player* original_selected_player = &(master_list[selected_team->roster.at(selected_team->current_player)]);
+			int original_selected_player_id = original_selected_player->player_id;
+			bool original_selected_player_was_skipped = 0;
+			bool whole_team_skipped = 0;
+			
+			//if(debugmode) cout << "[Server] Player " << original_selected_player_id + 1 << " of Team " << team_iterator + 1 << " is the first one to be checked." << '\n';
+			
+			//Picks the player to represent the team
+			while(true){				
+				selected_player = &(master_list[selected_team->roster.at(selected_team->current_player)]);
+				//If this was the original player (from the start of the while loop) and has already been skipped, then whole team is skipped
+				//Note that this will not trigger if the original player is being checked for the first time in the loop 
+				if (original_selected_player_was_skipped && selected_player->player_id == original_selected_player_id){
+					
+					//if(debugmode) cout << "[Server] Player " << original_selected_player_id + 1 << " of Team " << team_iterator + 1 << " has been skipped before, thus skipping the team." << '\n';
+					
+					whole_team_skipped = 1;
+					break;
+				}
+				//Checks if player needs to skip this turn
+				//Checks if player is DEAD
+				else if (selected_player->is_spectator){
+					//if(debugmode) cout << "[Server] Player " << selected_player->player_id + 1<< " of Team " << team_iterator + 1 << " is dead and spectating." << '\n';
+				}
+				//Checks if player is SKIPPED
+				else if (selected_player->skipped){
+					if (!original_selected_player_was_skipped && selected_player->player_id == original_selected_player_id){
+						original_selected_player_was_skipped = 1;
+					};
+					stringstream ss;
+					string temp = "Player ";
+					temp += selected_player->username;
+					temp += " of Team ";
+					ss << team_iterator + 1;
+					temp += ss.str();
+					temp+=" has been skipped!";
+					key_all(0,sockets);
+					message_all(temp, sockets);
+					cout << temp << endl;
+					selected_player->skipped = 0; //Now that he has been skipped, he can take his next turn					
+				}
+				//If player is allowed to take this turn, stop player selection
+				else{
+					superpinter(sockets);
+					//if(debugmode) cout << "[All] Player" << selected_player->player_id + 1 << " of Team " << team_iterator + 1 << " will take this turn." << '\n';
+					selected_team->current_player = (selected_team->current_player + 1) % selected_team->roster.size(); //Since this player will take this turn, the team's next player is set to next one
+					break;
+				}
+				selected_team->current_player = (selected_team->current_player + 1) % selected_team->roster.size(); //Check the player next in line
+			}
+			//If the whole team has been skipped, then we don't leave team and player selection phase. We check the next team.
+			if (whole_team_skipped){
+				stringstream ss;
+				string temp = "Team ";
+				ss << team_iterator + 1;
+				temp += ss.str();
+				temp+="'s players have been all skipped! Oof!";
+				key_all(0,sockets);
+				message_all(temp, sockets);
+				cout << temp << endl;
+				team_iterator = (team_iterator + 1) % team_count;
+				continue;
+			}
+			//If the whole team hasn't been skipped, then the selected_player moves to the Action Phase
+			//if(debugmode) cout << "[Server] Player " << selected_player->player_id + 1 << " of Team " << team_iterator + 1 << " will proceed to action phase." << '\n'; 
+			break;
+		}
+		//if(debugmode) cout << "[Server] TEAM SELECTION PHASE OVER." << '\n'; 
+		
+
+		//if(debugmode) cout << "[Server] ACTION PHASE START." << '\n';
+		selected_player->turnprep();
+		int tempid = selected_player->player_id;
+		for(int i = 1; i < PLAYERS; i++){
+			if(tempid == i)
+				sockets[i] << 0 << endl;
+			else
+				sockets[i] << -1 << endl;
+		}
+		while(selected_player->actions > 0){
+			if(tempid == 0){
+				cout << selected_player->username << ", you have " << selected_player->actions << ". ";
+				cout << "Please input an action command." << '\n';
+				cout << "Type help to see a list of commands." << '\n';
+				act(selected_player->team_id,*selected_player);
+			}
+			else{
+				sockets[tempid] << selected_player->username << ", you have " << selected_player->actions << "." << endl;
+				sockets[tempid] << 0;
+				sockets[tempid] << "Please input an action command." << endl;
+				sockets[tempid] << 0;
+				sockets[tempid] << "Type help to see a list of commands." << endl;
+				act_client(selected_player->team_id, *selected_player, sockets, tempid);
+			}
+		}
+		
+		//if(debugmode) cout << "[Server] ACTION PHASE END." << '\n';
+		//if(debugmode) cout << "[Server] Preparing for next turn..." << '\n';
+		team_iterator = (team_iterator + 1) % team_count;
+	}
 }
 
 void runClient(int argc, char* argv[]) {
@@ -792,20 +1047,56 @@ void runClient(int argc, char* argv[]) {
 			"\n\nAll players have successfully connected.\n";
 
 	char_create_client(player_ID, server);
-	cout << "finished charcreation";
+	
+	int key = -1;
+	string printstring = "";
+	int key_int = 0;
+	bool game_running;
+	while(game_running){
+		server[0] >> key;
+		server[0].ignore();
+		if(key == 0){
+			getline(server[0],printstring);
+			cout << printstring << endl;
+		}
+		if(key == 1){
+			server[0] >> key_int;
+			server[0].ignore();
+		}
+		if(key == 2){
+			game_running = false;
+		}
+		if(key == 3){
+			getline(cin, printstring);
+			server[0] << printstring;
+		}
+		key = -1;
+	}
 }
 
 int main(int argc, char* argv[]) {
     string s;
-
+	
     if (argc == 2) {
+		for(int i = 0; i < 5; i++){
+			if(isalpha(argv[1][i])){
+				cout << "ERROR: Port listed is invalid. Please select a port between 1024-65535.\n";
+				return 0;
+			}
+		}
 		if(atoi(argv[1]) < 1024 || atoi(argv[1]) > 65535){
 			cout << "ERROR: Port listed is invalid. Please select a port between 1024-65535.\n";
 			return 0;
 		}
         runServer(argc, argv);
     }
-	else {
+	else if(argc == 3){
+		for(int i = 0; i < 5; i++){
+			if(isalpha(argv[2][i])){
+				cout << "ERROR: Port listed is invalid. Please select a port between 1024-65535.\n";
+				return 0;
+			}
+		}
 		if(atoi(argv[2]) < 1024 || atoi(argv[1]) > 65535){
 			cout << "ERROR: Port listed is invalid. Please select a port between 1024-65535.\n";
 			return 0;
