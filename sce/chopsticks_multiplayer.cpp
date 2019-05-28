@@ -321,8 +321,10 @@ bool Player::distribute(vector<int> dist, int type, socketstream sockets[], int 
 	for(int i = 0; i < dist.size(); i++){
 		if(type==1)
 			cout << dist[i] << " ";
-		else
+		else{
+			sockets[player_ID] << 0 << endl;
 			sockets[player_ID] << dist[i] << " " << endl;
+		}
 	}
 	
 	vector<int> livehands;
@@ -498,6 +500,73 @@ void superpinter(socketstream sockets[]){
 		cout << "Player " << selected_player->player_id + 1 << " " << selected_player->username << " will take this turn!" << '\n';
 		cout << "#------------------------------------------------------------------------------" << '\n';
 	}
+	for(int q = 1; q < PLAYERS; q++){
+		sockets[q] << 0 << endl;
+		sockets[q] << "#------------------------------------------------------------------------------" << endl;
+		sockets[q] << 0 << endl;
+		sockets[q] << "STATUS BOARD" << endl;
+		sockets[q] << 0 << endl;
+		sockets[q] << "#------------------------------------------------------------------------------" << endl;
+		for(int i = 0; i < team_list.size(); i++){
+			sockets[q] << 0 << endl;
+			sockets[q] << "TEAM " << i + 1 << " : " <<endl;
+			sockets[q] << 0 << endl;
+			sockets[q] << team_list.at(i).roster.size() << " members." << endl;
+			Player* nextguy = &(master_list[team_list.at(i).roster[team_list.at(i).current_player]]);
+			sockets[q] << 0 << endl;
+			sockets[q] << "Player " << nextguy->player_id + 1 << " : " << nextguy->username << " is next." << endl;
+			for (int j = 0; j < team_list.at(i).roster.size(); j++){
+				Player* currplayer = &(master_list.at(team_list.at(i).roster[j]));
+				string temps;
+				if (currplayer->race == 0) temps = " Human ";
+				if (currplayer->race == 1) temps = " Alien ";
+				if (currplayer->race == 2) temps = " Zombie ";
+				if (currplayer->race == 3) temps = " Doggo ";
+				if (currplayer->skipped) temps += "- STATUS: Skipped.";
+				else if (currplayer->is_spectator)  temps += "- STATUS: Eliminated.";
+				else if (currplayer->player_id == nextguy->player_id) temps += "- STATUS: Next.";
+				else temps += "STATUS: Waiting for turn.";
+				sockets[q] << 0 << endl;
+				sockets[q] << currplayer->player_id + 1 << ". " << currplayer->username << " - " << temps << endl;
+				for (int i = 0; i < currplayer->hands.size(); i++){
+					if (currplayer->hands.at(i).fingers == 0){
+						sockets[q] << 0 << endl;
+						sockets[q] << "Hand " << i + 1 << " is free." << ". " << endl;
+					} 
+					sockets[q] << 0 << endl;
+					if (currplayer->hands.at(i).is_dead == 0){
+						sockets[q] << 0 << endl;
+						sockets[q] << "Hand " << i + 1 << " : " << currplayer->hands.at(i).fingers << ". " << endl;
+					}
+					else{
+						sockets[q] << 0 << endl;
+						sockets[q] << "Hand " << i + 1 << " is dead." << ". " << endl;
+					} 
+				}
+				for (int i = 0; i < currplayer->feet.size(); i++){
+					sockets[q] << 0 << endl;
+					if (currplayer->feet.at(i).fingers == 0){
+						//sockets[q] << 0 << endl;
+						sockets[q] << "Foot " << i + 1 << " is free." << ". " << endl;
+					} 
+					else if (!currplayer->feet.at(i).is_dead){
+
+						sockets[q] << "Foot " << i + 1 << " : " << currplayer->feet.at(i).fingers << ". " << endl;
+					} 
+					else sockets[q] << "Foot " << i + 1 << " is dead" << ". " << endl;
+				}
+			}	
+			sockets[q] << 0 << endl;
+			sockets[q] << "#------------------------------------------------------------------------------" << endl;		
+		}
+		if (!pre_game){
+			sockets[q] << 0 << endl;
+			sockets[q] << "Player " << selected_player->player_id + 1 << " " << selected_player->username << " will take this turn!" << endl;
+			sockets[q] << 0 << endl;
+			sockets[q] << "#------------------------------------------------------------------------------" << endl;
+		}
+	}
+	
 }
 
 //Game Functions
@@ -563,17 +632,17 @@ void act_client(int team, Player& actor, socketstream sockets[], int player_ID){
 			done = actor.attack();
 		}
 		else if (command == "help"){
-			sockets[player_ID] << 0;
+			sockets[player_ID] << 0 << endl;
 			sockets[player_ID] << "Available Actions:" << endl;
-			sockets[player_ID] << 0;
+			sockets[player_ID] << 0 << endl;
 			sockets[player_ID] << "Attack - opens a menu which allows you to pick a target and attack. (syntax: tap)"<< endl;
-			sockets[player_ID] << 0;
+			sockets[player_ID] << 0 << endl;
 			sockets[player_ID] << "Distribute - distributes fingers among your live hands. (syntax: disthands x x x, where x is no. of fingers) " << endl;
-			sockets[player_ID] << 0;
+			sockets[player_ID] << 0 << endl;
 			sockets[player_ID] << "Surrender - Quit the game. (syntax: surrender)" << endl;
 		}
 		else if (command == "surrender"){
-			sockets[player_ID] << 0;
+			sockets[player_ID] << 0 << endl;
 			sockets[player_ID] << "Are you sure you want to leave? Input 'yes' to confirm. Press enter to cancel." << endl;
 			string asd;
 			sockets[player_ID] << 3;
@@ -598,13 +667,13 @@ void act_client(int team, Player& actor, socketstream sockets[], int player_ID){
 				index++; 
 			}
 			if(distvalues.empty()){
-				sockets[player_ID] << 0;
+				sockets[player_ID] << 0 << endl;
 				sockets[player_ID] << "[Error] Disthands failed. Are you missing parameters?" << endl;
 			}
 			done = actor.distribute(distvalues,0, sockets, player_ID);
 		}
 		else{
-			sockets[player_ID] << 0;
+			sockets[player_ID] << 0 << endl;
 			sockets[player_ID] << "[Error] Command not recognised." << endl;
 		}
 	}
@@ -1013,9 +1082,9 @@ void runServer(int argc, char* argv[]) {
 			}
 			else{
 				sockets[tempid] << selected_player->username << ", you have " << selected_player->actions << "." << endl;
-				sockets[tempid] << 0;
+				sockets[tempid] << 0 << endl;
 				sockets[tempid] << "Please input an action command." << endl;
-				sockets[tempid] << 0;
+				sockets[tempid] << 0 << endl;
 				sockets[tempid] << "Type help to see a list of commands." << endl;
 				act_client(selected_player->team_id, *selected_player, sockets, tempid);
 			}
@@ -1051,7 +1120,7 @@ void runClient(int argc, char* argv[]) {
 	int key = -1;
 	string printstring = "";
 	int key_int = 0;
-	bool game_running;
+	bool game_running = true;
 	while(game_running){
 		server[0] >> key;
 		server[0].ignore();
